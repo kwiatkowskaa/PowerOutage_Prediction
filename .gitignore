@@ -1,0 +1,27 @@
+# Ignoring data files (large files)
+data/
+*.csv
+*.parquet
+*.h5
+*.pkl
+*.zip
+*.tar.gz
+*.R
+
+# Ignoring ML models
+models/
+*.h5
+*.pt
+*.onnx
+*.pkl
+
+# Ignoring virtual environment
+venv/
+.env
+*.pyc
+__pycache__/
+
+# Ignoring Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+
