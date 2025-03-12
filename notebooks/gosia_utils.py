@@ -1,22 +1,16 @@
 import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
+import numpy as np
 import plotly.express as px
-import pandas as pd
 import geopandas as gpd
 import geodatasets
 import os
-import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap, Normalize
-import seaborn as sns
 from statsmodels.tsa.stattools import grangercausalitytests, ccf
-import numpy as np
-import plotly.express as px
 from datetime import datetime
-import geopandas as gpd
 import warnings
-from datetime import datetime
+
 
 
 
@@ -34,6 +28,8 @@ def plot_event_counts(df):
     plt.xticks(rotation=90)
     
     plt.show()
+
+    
 
 def plot_event_trends(df):
     df['BEGIN_DATE_TIME'] = pd.to_datetime(df['BEGIN_DATE_TIME'])
@@ -230,8 +226,6 @@ def make_ts_power(county,
 
     return df_state_ts_power
 
-import pandas as pd
-from datetime import datetime
 
 def make_ts_events(county, event_types, start_year, start_month, start_day, end_year, end_month, end_day, df):
 
