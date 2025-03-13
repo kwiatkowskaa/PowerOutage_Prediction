@@ -234,7 +234,7 @@ def plot_monthly_event_trends(dfs):
 
 
 
-def plot_event_seasonality(df):
+def plot_state_event_seasonality(df):
     """
     Plots the seasonality of specific disaster events based on the month.
     
@@ -275,3 +275,233 @@ def plot_event_seasonality(df):
     
     # Show the plot
     plt.show()
+
+
+
+def plot_event_heatmap(df):
+    """
+    Plots a heatmap showing the monthly distribution of disaster events for the top 20 most affected counties.
+
+    Parameters:
+    - df (DataFrame): A Pandas DataFrame containing storm event data with 'STATE', 'BEGIN_DATE_TIME', and 'YEAR'.
+
+    Output:
+    - A heatmap visualizing the frequency of disaster events by month and county.
+    """
+
+    # Konwersja daty i ekstrakcja miesiąca
+    df['BEGIN_DATE_TIME'] = pd.to_datetime(df['BEGIN_DATE_TIME'])
+    df['MONTH'] = df['BEGIN_DATE_TIME'].dt.month
+
+    # Zliczanie liczby zdarzeń dla każdego hrabstwa
+    county_counts = df.groupby("STATE").size().nlargest(20).index
+    df_filtered = df[df["STATE"].isin(county_counts)]
+
+    # Grupowanie liczby zgłoszeń na miesiąc dla każdego hrabstwa
+    heatmap_data = df_filtered.groupby(['STATE', 'MONTH']).size().unstack(fill_value=0)
+
+    # Tworzenie wykresu heatmapy
+    plt.figure(figsize=(14, 8))
+    sns.heatmap(heatmap_data, cmap="rocket_r", linewidths=0.5, annot=True, fmt="d")
+
+    # Ustawienie etykiet
+    plt.title('Monthly Distribution of Storm Events in Top 20 States', fontsize=14)
+    plt.xlabel('Month', fontsize=12)
+    plt.ylabel('County (State)', fontsize=12)
+    plt.xticks(ticks=range(12), labels=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                                         'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], rotation=45)
+    plt.yticks(rotation=0)
+
+    # Wyświetlenie wykresu
+    plt.show()
+
+
+
+def plot_top_damage_events(df, damage_type):
+    """
+    Plots the top 10 disaster event types that caused the highest property damage.
+
+    Output:
+    - A horizontal bar chart displaying the top 10 disaster categories with the highest total property damage.
+    """
+        
+    # Extract the year from the DataFrame
+    year = int(df[['YEAR']].iloc[0, 0])
+
+    # Group by event type and sum the total property damage, then select the top 10
+    top_damage = df.groupby('EVENT_TYPE')['DAMAGE_PROPERTY'].sum().sort_values(ascending=False).head(10)
+    
+    # Create the bar chart
+    plt.figure(figsize=(12, 6))
+    plt.barh(top_damage.index, top_damage.values, color='219ebc')
+    
+    # Set labels and title
+    plt.xlabel('Property Damage ($)', fontsize=12)
+    plt.ylabel('Event Type', fontsize=12)
+    plt.title(f'Top 10 Disaster Categories with the Highest Property Damage in {year}', fontsize=14)
+    
+    # Invert the y-axis for better visualization (highest damage at the top)
+    plt.gca().invert_yaxis()
+    
+    # Show the plot
+    plt.show()
+
+
+
+def plot_top_damage_events(df, damage_type='DAMAGE_PROPERTY'):
+    """
+    Plots the top 10 disaster event types that caused the highest financial losses.
+
+    Parameters:
+    - df (DataFrame): A Pandas DataFrame containing storm event data.
+    - damage_type (str): Column name specifying which type of damage to analyze ('DAMAGE_PROPERTY' or 'DAMAGE_CROPS').
+
+    Output:
+    - A horizontal bar chart displaying the top 10 disaster categories with the highest total damage.
+    """
+    # Extract the year from the DataFrame
+    year = int(df[['YEAR']].iloc[0, 0])
+    
+    # Validate damage_type input
+    if damage_type not in df.columns:
+        raise ValueError(f"Column '{damage_type}' not found in the DataFrame. Choose 'DAMAGE_PROPERTY' or 'DAMAGE_CROPS'.")
+
+    # Group by event type and sum the total damage, then select the top 10
+    top_damage = df.groupby('EVENT_TYPE')[damage_type].sum().sort_values(ascending=False).head(10)
+    
+    # Define plot title dynamically based on selected damage type
+    damage_label = "Property Damage" if damage_type == 'DAMAGE_PROPERTY' else "Crop Damage"
+    
+    # Create the bar chart
+    plt.figure(figsize=(12, 6))
+    plt.barh(top_damage.index, top_damage.values, color='#219ebc')
+    
+    # Set labels and title
+    plt.xlabel(f'{damage_label} ($)', fontsize=12)
+    plt.ylabel('Event Type', fontsize=12)
+    plt.title(f'Top 10 Disaster Categories with the Highest {damage_label} in {year}', fontsize=14)
+    
+    # Invert the y-axis for better visualization (highest damage at the top)
+    plt.gca().invert_yaxis()
+    
+    # Show the plot
+    plt.show()
+
+
+
+
+def convert_damage(value):
+    """
+    Converts damage values from string format with suffixes ('K', 'M', 'B') to numerical format.
+    
+    Parameters:
+    - value (str, float, or NaN): The damage value that may contain suffixes:
+        - 'K' (thousands) → Multiplies by 1,000
+        - 'M' (millions) → Multiplies by 1,000,000
+        - 'B' (billions) → Multiplies by 1,000,000,000
+        - If the value is already a number or does not contain a suffix, it is returned as a float.
+    
+    Returns:
+    - float: The numerical equivalent of the damage value.
+    """
+    
+    if pd.isna(value) or value == '':  # Handle missing or empty values
+        return 0.0
+    
+    value = str(value).upper().strip()  # Convert to uppercase and remove spaces
+    
+    if value.endswith('K'):  # Thousands
+        return float(value.replace('K', '')) * 1_000
+    elif value.endswith('M'):  # Millions
+        return float(value.replace('M', '')) * 1_000_000
+    elif value.endswith('B'):  # Billions
+        return float(value.replace('B', '')) * 1_000_000_000
+    else:  # Assume it's already a numeric value
+        return float(value)
+    
+
+
+
+
+def plot_monthly_damage(dfs, damage_type='DAMAGE_PROPERTY'):
+    """
+    Plots the monthly trend of financial damage caused by weather events over multiple years.
+    
+    Parameters:
+    - dfs (list of DataFrames): A list of Pandas DataFrames, each containing storm event data for a single year.
+    - damage_type (str): Specifies the type of damage to analyze ('DAMAGE_PROPERTY' or 'DAMAGE_CROPS').
+
+    Output:
+    - A line plot displaying monthly financial damage trends for each year.
+    """
+        # Combine all yearly DataFrames into one
+    df_combined = pd.concat(dfs, ignore_index=True)
+
+    # Convert date column to datetime format
+    df_combined['BEGIN_DATE_TIME'] = pd.to_datetime(df_combined['BEGIN_DATE_TIME'])
+
+    # Extract year and month
+    df_combined['YEAR'] = df_combined['BEGIN_DATE_TIME'].dt.year
+    df_combined['MONTH'] = df_combined['BEGIN_DATE_TIME'].dt.month
+
+    # Ensure is numeric and handle missing values
+    df_combined['damage_type'] = pd.to_numeric(df_combined[damage_type], errors='coerce').fillna(0)
+
+    # Sum total damage for each month and year
+    monthly_damage = df_combined.groupby(['YEAR', 'MONTH'])['damage_type'].sum().reset_index()
+
+    # Define plot title dynamically based on selected damage type
+    damage_label = "Property Damage" if damage_type == 'DAMAGE_PROPERTY' else "Crop Damage"
+
+    # Plot the trends
+    plt.figure(figsize=(14, 7))
+    sns.lineplot(data=monthly_damage, x='MONTH', y='damage_type', hue='YEAR', marker='o', palette='tab10', linewidth=2)
+
+    plt.title(f'Monthly {damage_label} Trends Over the Years', fontsize=14)
+    plt.xlabel('Month', fontsize=12)
+    plt.ylabel('Total Property Damage ($)', fontsize=12)
+    plt.xticks(ticks=range(1, 13), labels=['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+    plt.legend(title='Year')
+    plt.grid(True, linestyle='--', alpha=0.7)
+
+    plt.show()
+
+
+
+
+
+
+    # # Validate damage_type input
+    # if damage_type not in dfs[0].columns:
+    #     raise ValueError(f"Column '{damage_type}' not found in the DataFrame. Choose 'DAMAGE_PROPERTY' or 'DAMAGE_CROPS'.")
+    
+    # plt.figure(figsize=(12, 6))
+
+    # # Iterate through each year's DataFrame
+    # for df in dfs:
+    #     df['MONTH'] = pd.to_datetime(df['BEGIN_DATE_TIME']).dt.month
+    #     year = int(df['YEAR'].iloc[0])  # Extract the year from the DataFrame
+        
+    #     # Group by month and sum the damage
+    #     monthly_damage = df.groupby('MONTH')[damage_type].sum()
+        
+    #     # Plot the data for each year
+    #     plt.plot(monthly_damage.index, monthly_damage.values, label=f'{year}', marker='o')
+
+    # # Define plot title dynamically based on selected damage type
+    # damage_label = "Property Damage" if damage_type == 'DAMAGE_PROPERTY' else "Crop Damage"
+
+    # # Set labels and title
+    # plt.xlabel('Month', fontsize=12)
+    # plt.ylabel(f'{damage_label} ($)', fontsize=12)
+    # plt.title(f'Monthly {damage_label} Trends Over the Years', fontsize=14)
+
+    # # Format x-axis with month labels
+    # plt.xticks(range(1, 13), ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
+
+    # # Add grid and legend
+    # plt.grid(True, linestyle='--', alpha=0.7)
+    # plt.legend(title='Year')
+
+    # # Show the plot
+    # plt.show()
