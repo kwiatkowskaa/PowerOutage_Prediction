@@ -434,7 +434,7 @@ def plot_monthly_damage(dfs, damage_type='DAMAGE_PROPERTY'):
     Output:
     - A line plot displaying monthly financial damage trends for each year.
     """
-        # Combine all yearly DataFrames into one
+    # Combine all yearly DataFrames into one
     df_combined = pd.concat(dfs, ignore_index=True)
 
     # Convert date column to datetime format
@@ -469,39 +469,26 @@ def plot_monthly_damage(dfs, damage_type='DAMAGE_PROPERTY'):
 
 
 
+def calculate_reporting_counties(dfs_outages, all_fips):
+    """
+    Calculates the number and percentage of counties that reported at least one outage
+    in each year relative to the total number of counties (all_fips).
 
+    Parameters:
+    dfs_outages (list of DataFrames): List of outage DataFrames for different years.
+    all_fips (set): Set of all county FIPS codes.
 
-    # # Validate damage_type input
-    # if damage_type not in dfs[0].columns:
-    #     raise ValueError(f"Column '{damage_type}' not found in the DataFrame. Choose 'DAMAGE_PROPERTY' or 'DAMAGE_CROPS'.")
+    Returns:
+    list of tuples: Each tuple contains (year, reporting_count, total_counties, percentage).
+    """
+    results = []
     
-    # plt.figure(figsize=(12, 6))
+    for year, df in zip(range(2014, 2024), dfs_outages):
+        reporting_fips = set(df["fips_code"].unique())  # Counties that reported outages
+        reporting_count = len(reporting_fips)
+        total_counties = len(all_fips)
+        percentage = (reporting_count / total_counties) * 100
 
-    # # Iterate through each year's DataFrame
-    # for df in dfs:
-    #     df['MONTH'] = pd.to_datetime(df['BEGIN_DATE_TIME']).dt.month
-    #     year = int(df['YEAR'].iloc[0])  # Extract the year from the DataFrame
-        
-    #     # Group by month and sum the damage
-    #     monthly_damage = df.groupby('MONTH')[damage_type].sum()
-        
-    #     # Plot the data for each year
-    #     plt.plot(monthly_damage.index, monthly_damage.values, label=f'{year}', marker='o')
+        results.append((year, reporting_count, total_counties, round(percentage, 2)))
 
-    # # Define plot title dynamically based on selected damage type
-    # damage_label = "Property Damage" if damage_type == 'DAMAGE_PROPERTY' else "Crop Damage"
-
-    # # Set labels and title
-    # plt.xlabel('Month', fontsize=12)
-    # plt.ylabel(f'{damage_label} ($)', fontsize=12)
-    # plt.title(f'Monthly {damage_label} Trends Over the Years', fontsize=14)
-
-    # # Format x-axis with month labels
-    # plt.xticks(range(1, 13), ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'])
-
-    # # Add grid and legend
-    # plt.grid(True, linestyle='--', alpha=0.7)
-    # plt.legend(title='Year')
-
-    # # Show the plot
-    # plt.show()
+    return results
