@@ -492,3 +492,215 @@ def calculate_reporting_counties(dfs_outages, all_fips):
         results.append((year, reporting_count, total_counties, round(percentage, 2)))
 
     return results
+
+
+def make_ts_power(county,
+                  start_year,
+                  start_month,
+                  start_day,
+                  end_year,
+                  end_month,
+                  end_day,
+                  data_directory = './data/data/eaglei_data'):
+    
+    """
+    Creates a time series of the number of customers without power in a specified county based on outage data 
+    from CSV files located in the `data_directory` folder. The steps include:
+    1. Reading CSV files for each year in the range [start_year, end_year].
+    2. Filtering data for the specified county.
+    3. Grouping data by the time of outage (in 15-minute intervals).
+    4. Returning the number of customers without power for the specified time range.
+    """
+
+    df_list = []
+    for year in range(start_year, end_year + 1):
+        file_name = f"eaglei_outages_{year}.csv"
+        file_path = os.path.join(data_directory, file_name)
+        if not os.path.exists(file_path):
+            raise FileNotFoundError(f"The file {file_name} does not exist in the directory {data_directory}.")
+
+        df = pd.read_csv(file_path)
+        df['run_start_time'] = pd.to_datetime(df['run_start_time'])
+        df.dropna(subset=['customers_out'],inplace=True)
+
+        df_state = df[df['county'].str.upper()==county.upper()].copy(deep=True)
+        df_state_ts_cus = df_state.groupby('run_start_time')['customers_out'].sum().reset_index()
+        df_state_ts_cus.drop(df_state_ts_cus.index[-1], inplace=True)
+        df_state_ts_cus.set_index('run_start_time', inplace=True)
+        df_state_ts_cus.rename_axis('time', inplace=True)
+
+
+        df_list.append(df_state_ts_cus)
+
+    concat_df = pd.concat(df_list, ignore_index=False)
+    start_date = pd.Timestamp(year=start_year, month=start_month, day=start_day)
+    end_date = pd.Timestamp(year=end_year, month=end_month, day=end_day+1)
+    df_state_ts_power = concat_df.loc[start_date:end_date].copy(deep=True)
+    df_state_ts_power.drop(df_state_ts_power.index[-1], inplace=True)
+
+    return df_state_ts_power
+
+
+def make_ts_events(county, event_types, start_year, start_month, start_day, end_year, end_month, end_day, df):
+
+    """
+    Creates a time series of event counts and sums for specific event types (e.g., injuries, deaths) 
+    in a specified county from the provided event data.
+    The steps include:
+    1. Filtering the event data based on the county and event types.
+    2. Creating a time series for the events, with data aggregated in 15-minute intervals.
+    3. Calculating the sum values for injuries and deaths during the events.
+    4. Returning the time series with event counts and sums for the specified time range.
+    """
+
+    start_date = datetime(start_year, start_month, start_day)
+    end_date = datetime(end_year, end_month, end_day, 23, 45) 
+    time_index = pd.date_range(start=start_date, end=end_date, freq='15min')
+
+    new_df = pd.DataFrame({'time': time_index})
+
+    for event_type in event_types:
+        new_df[f'event_count {event_type}'] = 0  
+
+    avg_cols = ['injuries_direct', 'injuries_indirect', 'deaths_direct', 'deaths_indirect']
+    for col in avg_cols:
+        new_df[col] = 0.0
+
+    df['BEGIN_DATETIME'] = pd.to_datetime(
+        df['BEGIN_YEARMONTH'].astype(str) + df['BEGIN_DAY'].astype(str).str.zfill(2) +
+        df['BEGIN_TIME'].astype(str).str.zfill(4), format='%Y%m%d%H%M'
+    )
+    df['END_DATETIME'] = pd.to_datetime(
+        df['END_YEARMONTH'].astype(str) + df['END_DAY'].astype(str).str.zfill(2) +
+        df['END_TIME'].astype(str).str.zfill(4), format='%Y%m%d%H%M'
+    )
+
+    filtered_df = df[
+        (df['CZ_NAME'].str.upper() == county.upper()) &
+        (df['EVENT_TYPE'].isin(event_types)) &
+        (df['END_DATETIME'] >= start_date) &
+        (df['BEGIN_DATETIME'] <= end_date)
+    ].copy(deep=True)
+
+    for event_type in event_types:
+        event_subset = filtered_df[filtered_df['EVENT_TYPE'] == event_type]
+
+        for _, row in event_subset.iterrows():
+            event_start = row['BEGIN_DATETIME']
+            event_end = row['END_DATETIME']
+
+            event_start_rounded = event_start.round('15min')
+            event_end_rounded = event_end.round('15min')
+
+            start_idx = new_df['time'].searchsorted(event_start_rounded)
+            end_idx = new_df['time'].searchsorted(event_end_rounded)
+
+            if start_idx < len(new_df) and end_idx <= len(new_df):
+                new_df.loc[start_idx:end_idx, f'event_count {event_type}'] += 1
+                new_df.loc[start_idx:end_idx, 'injuries_direct'] += row['INJURIES_DIRECT']
+                new_df.loc[start_idx:end_idx, 'injuries_indirect'] += row['INJURIES_INDIRECT']
+                new_df.loc[start_idx:end_idx, 'deaths_direct'] += row['DEATHS_DIRECT']
+                new_df.loc[start_idx:end_idx, 'deaths_indirect'] += row['DEATHS_INDIRECT']
+
+    #total_events = new_df[[f'event_count {event_type}' for event_type in event_types]].sum(axis=1)
+    #for col in avg_cols:
+    #    new_df[col] = new_df[col] / total_events.replace(0, 1) 
+
+
+    new_df['YEAR'] = new_df['time'].dt.year
+    new_df['MONTH'] = new_df['time'].dt.month
+    new_df['DAY'] = new_df['time'].dt.day
+
+    cols_order = ['YEAR', 'MONTH', 'DAY', 'time'] + avg_cols + [col for col in new_df.columns if col not in ['YEAR', 'MONTH', 'DAY', 'time'] + avg_cols]
+    new_df = new_df[cols_order]
+
+    return new_df
+def aggregate_ts(df, agg_type):
+    """
+    Aggregates the given time series data by either hour or day.
+    The function performs the following:
+    1. Groups the data by the specified time interval ('hour' or 'day').
+    2. Aggregates the values using the sum for each time period.
+    3. Returns the aggregated time series.
+    """
+
+    df.index = pd.to_datetime(df.index)
+
+    
+
+    if agg_type == 'hour':
+        #df_agg = df.groupby(pd.Grouper(freq='h')).mean()
+        df_agg = df.groupby(pd.Grouper(freq='h')).sum()
+
+    elif agg_type == 'day':
+        #df_agg = df.groupby(pd.Grouper(freq='D')).mean()
+        df_agg = df.groupby(pd.Grouper(freq='D')).sum()
+
+    else:
+        raise ValueError("Invalid aggregation type. Use 'hour' or 'day'.")
+
+    df_agg.fillna(0, inplace=True)
+
+    return df_agg
+
+def combine_agg_ts1(county,
+                   start_year,
+                   start_month,
+                   start_day,
+                   end_year,
+                   end_month,
+                   end_day,
+                   data_directory_power = './data/data/eaglei_data',
+                   data_directory_events = './data/data/NOAA_StormEvents'):
+    
+    """
+    Combines the aggregated power outage data and event data (e.g., storm events) for a specified county
+    and time range. The steps include:
+    1. Loading power outage data for the given county and time range.
+    2. Aggregating the power outage data by hour and day.
+    3. Loading event data for the given county and time range.
+    4. Aggregating the event data by hour and day.
+    5. Merging the aggregated power outage data with the event data.
+    6. Returning the combined time series data for both hourly and daily aggregations.
+    """
+
+
+    df_state_ts_power = make_ts_power(county = county,
+                                      start_year = start_year,
+                                      start_month = start_month,
+                                      start_day = start_day,
+                                      end_year = end_year,
+                                      end_month = end_month,
+                                      end_day = end_day,
+                                      data_directory = data_directory_power)
+
+    df_state_ts_power_hr = aggregate_ts(df_state_ts_power, 'hour')
+    df_state_ts_power_day = aggregate_ts(df_state_ts_power, 'day')
+
+
+
+    df_events = pd.read_csv(os.path.join(data_directory_events, "StormEvents_2014_2024.csv"))
+    df_state_events=df_events[df_events['CZ_NAME'].str.upper()==county.upper()].copy(deep=True)
+    event_types_state = list(df_state_events['EVENT_TYPE'].unique())
+    df_state_ts_events = make_ts_events(county = county,
+                                        event_types= event_types_state,
+                                        start_year = start_year,
+                                        start_month = start_month,
+                                        start_day = start_day,
+                                        end_year = end_year,
+                                        end_month = end_month,
+                                        end_day = end_day,
+                                        df=df_events)
+    
+
+    df_state_ts_events['time'] = pd.to_datetime(df_state_ts_events['time'])
+    df_state_ts_events.set_index('time', inplace=True)
+    df_state_ts_events.drop(columns=['YEAR', 'DAY', 'MONTH'], inplace=True)
+
+    df_state_ts_events_hr = aggregate_ts(df_state_ts_events, 'hour')
+    df_state_ts_events_day = aggregate_ts(df_state_ts_events, 'day')
+
+    df_state_ts_comb_hr = pd.merge(df_state_ts_events_hr, df_state_ts_power_hr, left_index=True, right_index=True)
+    df_state_ts_comb_day = pd.merge(df_state_ts_events_day, df_state_ts_power_day, left_index=True, right_index=True)
+
+    return df_state_ts_comb_hr, df_state_ts_comb_day
