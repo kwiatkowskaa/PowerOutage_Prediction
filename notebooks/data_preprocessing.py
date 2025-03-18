@@ -494,6 +494,8 @@ def calculate_reporting_counties(dfs_outages, all_fips):
     return results
 
 
+
+
 def make_ts_power(county,
                   start_year,
                   start_month,
@@ -539,6 +541,8 @@ def make_ts_power(county,
     df_state_ts_power.drop(df_state_ts_power.index[-1], inplace=True)
 
     return df_state_ts_power
+
+
 
 
 def make_ts_events(county, event_types, start_year, start_month, start_day, end_year, end_month, end_day, df):
@@ -615,6 +619,10 @@ def make_ts_events(county, event_types, start_year, start_month, start_day, end_
     new_df = new_df[cols_order]
 
     return new_df
+
+
+
+
 def aggregate_ts(df, agg_type):
     """
     Aggregates the given time series data by either hour or day.
@@ -642,6 +650,8 @@ def aggregate_ts(df, agg_type):
     df_agg.fillna(0, inplace=True)
 
     return df_agg
+
+
 
 def combine_agg_ts1(county,
                    start_year,
@@ -704,3 +714,553 @@ def combine_agg_ts1(county,
     df_state_ts_comb_day = pd.merge(df_state_ts_events_day, df_state_ts_power_day, left_index=True, right_index=True)
 
     return df_state_ts_comb_hr, df_state_ts_comb_day
+
+
+
+
+def countyCountYEarly(year_start, year_end):
+    """
+    Analyzes power outage data from CSV files for a given range of years, 
+    counts the number of unique counties (FIPS codes) affected each year, 
+    and visualizes the results using a bar chart.
+
+    Parameters:
+    year_start (int): The starting year of the analysis.
+    year_end (int): The ending year of the analysis.
+
+    Output:
+    A bar chart displaying the number of unique FIPS codes per year.
+    """
+
+    # Define the folder where CSV files are stored
+    data_folder = '../data/eaglei_data/'
+
+    # Generate a range of years to process
+    years = range(year_start, year_end + 1)
+
+    # List to store the count of unique FIPS codes per year
+    year_counts = []
+
+    # Iterate through each year in the specified range
+    for year in years:
+        # Construct the expected filename for the given year
+        file_name = f'eaglei_outages_{year}.csv'
+        file_path = os.path.join(data_folder, file_name)
+        
+        # Check if the file exists, if not, append 0 and continue to the next year
+        if not os.path.exists(file_path):
+            print(f"File {file_name} doesn't exist!")
+            year_counts.append(0)
+            continue
+
+        # Read the CSV file into a Pandas DataFrame
+        df_power = pd.read_csv(file_path)
+
+        # Count the number of unique FIPS codes in the dataset
+        unique_fips_count = df_power['fips_code'].nunique()
+        
+        # Append the count to the list
+        year_counts.append(unique_fips_count)
+
+    # Plot the results using a bar chart
+    plt.figure(figsize=(10, 6))  # Set the figure size
+    bars = plt.bar(years, year_counts, color='skyblue', edgecolor='black')  # Create bars
+    
+    # Label the axes and title
+    plt.xlabel("Year", fontsize=12)
+    plt.ylabel("Number of Unique FIPS Codes", fontsize=12)
+    plt.title("Unique FIPS Codes per Year", fontsize=16)
+    plt.xticks(years, rotation=45)  # Rotate x-axis labels for better readability
+    plt.grid(axis='y', linestyle='--', alpha=0.7)  # Add a dashed grid for better readability
+
+    # Add text labels on top of each bar
+    for bar, count in zip(bars, year_counts):
+        plt.text(bar.get_x() + bar.get_width() / 2, bar.get_height(), str(count), 
+                 ha='center', va='bottom', fontsize=10, color='black')
+
+    # Adjust layout and display the plot
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+def countyCountBarPlots(year_start, year_end):
+    """
+    Analyzes power outage data from CSV files for a given range of years, 
+    counts the number of unique counties (FIPS codes) affected in each state per year, 
+    and visualizes the results using horizontal bar charts for each year.
+
+    Parameters:
+    year_start (int): The starting year of the analysis.
+    year_end (int): The ending year of the analysis.
+
+    Output:
+    A grid of horizontal bar charts displaying the number of unique FIPS codes per state for each year.
+    """
+
+    # Define the folder where CSV files are stored
+    data_folder = '../data/eaglei_data/'
+
+    # Generate a range of years to process
+    years = range(year_start, year_end + 1)
+
+    # Create an empty DataFrame for potential combined analysis (currently unused)
+    combined_data = pd.DataFrame()
+
+    # Define the number of columns in the subplot grid
+    cols = 3  # Number of columns in the plot grid
+    rows = -(-len(years) // cols)  # Calculate the number of rows (ceiling division)
+
+    # Create a figure and axes for multiple subplots
+    fig, axes = plt.subplots(rows, cols, figsize=(15, 7 * rows))
+    axes = axes.flatten()  # Flatten the 2D array of axes for easy iteration
+
+    # Iterate through each year in the specified range
+    for i, year in enumerate(years):
+        # Construct the expected filename for the given year
+        file_name = f'eaglei_outages_{year}.csv'
+        file_path = os.path.join(data_folder, file_name)
+        
+        # Check if the file exists, if not, print a message and skip to the next year
+        if not os.path.exists(file_path):
+            print(f"File {file_name} doesn't exist!")
+            continue
+
+        # Read the CSV file into a Pandas DataFrame
+        df_power = pd.read_csv(file_path)
+
+        # Standardize state names (corrects 'US Virgin Islands' to 'United States Virgin Islands')
+        df_power['state'] = df_power['state'].replace('US Virgin Islands', 'United States Virgin Islands')
+
+        # Count the number of unique FIPS codes per state, sorting the results
+        unique_fips = (
+            df_power.groupby('state')['fips_code']
+            .nunique()
+            .reset_index()
+            .sort_values(by='fips_code')
+        )
+
+        # Create a horizontal bar chart for the given year
+        axes[i].barh(unique_fips['state'], unique_fips['fips_code'], color='skyblue')
+        axes[i].set_title(f'Number of Counties in {year}')
+        axes[i].set_xlabel('Number of Counties')
+        axes[i].set_ylabel('State')
+
+    # Remove any unused subplots in the grid
+    for j in range(len(years), len(axes)):
+        fig.delaxes(axes[j])
+
+    # Adjust layout and display the plot
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
+def countyCountBarPlots_v2(year_start, year_end):
+    """
+    Analyzes power outage data from CSV files for a given range of years, 
+    counts the number of unique counties (FIPS codes) affected in each state per year, 
+    and visualizes the results using a grouped horizontal bar chart.
+
+    Parameters:
+    year_start (int): The starting year of the analysis.
+    year_end (int): The ending year of the analysis.
+
+    Output:
+    A horizontal bar chart displaying the number of unique FIPS codes per state across multiple years.
+    """
+
+    # Define the folder where CSV files are stored
+    data_folder = '../data/eaglei_data/'
+
+    # Generate a range of years to process
+    years = range(year_start, year_end + 1)
+
+    # Initialize an empty DataFrame to store data for all years
+    combined_data = pd.DataFrame()
+
+    # Iterate through each year in the specified range
+    for year in years:
+        # Construct the expected filename for the given year
+        file_name = f'eaglei_outages_{year}.csv'
+        file_path = os.path.join(data_folder, file_name)
+
+        # Check if the file exists, if not, print a message and skip to the next year
+        if not os.path.exists(file_path):
+            print(f"File {file_name} doesn't exist!")
+            continue
+
+        # Read the CSV file into a Pandas DataFrame
+        df_power = pd.read_csv(file_path)
+
+        # Standardize state names (corrects 'US Virgin Islands' to 'United States Virgin Islands')
+        df_power['state'] = df_power['state'].replace('US Virgin Islands', 'United States Virgin Islands')
+
+        # Count the number of unique FIPS codes per state, sorting the results
+        unique_fips = (
+            df_power.groupby('state')['fips_code']
+            .nunique()
+            .reset_index()
+            .sort_values(by='fips_code')
+        )
+
+        # Rename the column with the current year to prepare for merging
+        unique_fips = unique_fips.rename(columns={'fips_code': year})
+
+        # Merge data for different years into a single DataFrame
+        if combined_data.empty:
+            combined_data = unique_fips  # First year's data
+        else:
+            combined_data = pd.merge(combined_data, unique_fips, on='state', how='outer')
+
+    # Extract state names
+    states = combined_data['state']
+
+    # Create y-axis positions for states
+    y_indexes = np.arange(len(states))  
+
+    # Determine bar height for each year (ensures bars don't overlap completely)
+    height = 0.9 / len(years)  
+
+    # Set figure size dynamically based on the number of years
+    plt.figure(figsize=(15, 3 * len(years)))
+
+    # Create horizontal bars for each year
+    for i, year in enumerate(years):
+        plt.barh(y_indexes + i * height, combined_data[year], height=height, label=str(year))
+
+    # Label axes and title
+    plt.ylabel("State", fontsize=12)
+    plt.xlabel("Number of Counties", fontsize=12)
+    plt.title(f"Number of Counties per State with Power Outages Data ({year_start} - {year_end})", fontsize=16)
+
+    # Adjust y-axis ticks to align with state names
+    plt.yticks(y_indexes + (len(years) - 1) * height / 2, states)
+
+    # Add legend for years
+    plt.legend(title="Year", fontsize=10)
+
+    # Adjust layout and display the plot
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+
+def missingCountyMap(years):
+    """
+    Visualizes missing county data for power outages across multiple years using maps.
+
+    Parameters:
+    years (list of int): A list of years for which missing county data should be mapped.
+
+    Output:
+    A series of maps (one per year) showing counties with and without recorded outage data.
+    """
+
+    # Path to the shapefile containing US county boundaries
+    shapefile_path = "../data/US_county_2/cb_2018_us_county_500k.shp"
+
+    # Load county geometries using GeoPandas
+    counties = gpd.read_file(shapefile_path)
+    
+    # Ensure GEOID (FIPS code) is stored as a string for proper merging
+    counties['GEOID'] = counties['GEOID'].astype(str)
+
+    # Define the folder where power outage data CSV files are stored
+    data_folder = '../data/eaglei_data/'
+
+    # Determine the number of columns (one plot per year, arranged in a row)
+    cols = len(years)  
+    fig, axes = plt.subplots(1, cols, figsize=(5 * cols, 3))  # Single-row grid of maps
+
+    # Loop through each specified year
+    for idx, year in enumerate(years):
+        # Construct the expected filename for the given year
+        file_name = f'eaglei_outages_{year}.csv'
+        file_path = os.path.join(data_folder, file_name)
+
+        # Check if the file exists, if not, print a message and skip to the next year
+        if not os.path.exists(file_path):
+            print(f"File {file_name} doesn't exist!")
+            continue
+
+        # Read the power outage data into a Pandas DataFrame
+        df_power = pd.read_csv(file_path)
+
+        # Ensure FIPS codes are strings and correctly formatted to five digits
+        df_power['fips_code'] = df_power['fips_code'].astype(str).str.zfill(5)
+
+        # Create a DataFrame containing unique FIPS codes for counties with data
+        fips_codes = pd.DataFrame(df_power['fips_code'].unique(), columns=["FIPS"])
+
+        # Merge the county geometries with the FIPS codes from the outage dataset
+        merged = counties.merge(fips_codes, left_on='GEOID', right_on='FIPS', how='left')
+
+        # Create a column indicating whether data is available (1 = data available, 0 = missing)
+        merged['Data'] = merged['FIPS'].apply(lambda x: 0 if pd.isna(x) else 1)
+
+        # Define the bounding box for the mainland US (excludes Alaska and Hawaii)
+        us_bounds = box(-125, 24, -66, 50)
+        mainland_us = merged[merged.geometry.intersects(us_bounds)]
+
+        # Separate counties with and without recorded data
+        nan_counties = mainland_us[mainland_us['FIPS'].isna()]  # Missing data
+        non_nan_counties = mainland_us[mainland_us['FIPS'].notna()]  # Recorded data
+
+        # Select the correct subplot axis for the current year
+        ax = axes[idx]
+
+        # Plot missing counties in black
+        nan_counties.plot(ax=ax, color="black", edgecolor="black", label="No data")
+
+        # Plot counties with recorded data in white with grey borders
+        non_nan_counties.plot(ax=ax, color="white", edgecolor="grey", label="Recorded data")
+
+        # Set the title for the subplot
+        ax.set_title(f"Missing counties {year}")
+
+        # Remove axis labels for a cleaner visualization
+        ax.set_axis_off()
+
+    # Adjust layout for better spacing
+    plt.tight_layout()
+
+    # Display the plots
+    plt.show()
+
+
+
+def missingCountyMapManyYears(df):
+    """
+    Generates a map of the mainland US showing counties with available power outage data 
+    across multiple years using a color scale.
+
+    Parameters:
+    df (DataFrame): A Pandas DataFrame containing county FIPS codes and corresponding 
+                    normalized non-null values indicating data availability.
+
+    Output:
+    A choropleth map of the mainland US where counties are shaded based on the amount 
+    of available power outage data over multiple years.
+    """
+
+    # Load state boundaries for reference (GeoJSON format)
+    url = "https://raw.githubusercontent.com/PublicaMundi/MappingAPI/master/data/geojson/us-states.json"
+    usa_states = gpd.read_file(url)
+
+    # Load county shapefile (for accurate geographical representation)
+    shapefile_path = "../data/US_county_2/cb_2018_us_county_500k.shp"
+    counties = gpd.read_file(shapefile_path)
+
+    # Ensure FIPS codes in the county dataset are stored as strings
+    counties['GEOID'] = counties['GEOID'].astype(str)
+
+    # Convert FIPS codes in the input DataFrame to strings and ensure they are 5-digit formatted
+    df.loc[:, 'fips_code'] = df['fips_code'].astype(str).str.zfill(5)
+
+    # Extract unique FIPS codes from the DataFrame and reshape them into a column
+    fips_codes = df.iloc[:, 0].to_numpy().reshape(-1, 1)
+    fips_codes = pd.DataFrame(np.unique(fips_codes))
+
+    # Ensure FIPS codes are treated as strings and rename column for clarity
+    fips_codes = fips_codes.astype(str)
+    fips_codes = fips_codes.rename(columns={0: "FIPS"})
+
+    # Add the 'Data' column, which represents normalized availability of outage data
+    fips_codes['Data'] = df['normalized_non_nan']
+
+    # Merge county geometries with FIPS codes to associate data availability
+    merged = counties.merge(fips_codes, left_on='GEOID', right_on='FIPS', how='left')
+
+    # Fill missing values with 0 (indicating no outage data for those counties)
+    merged['Data'] = merged['Data'].fillna(0)
+
+    # Define the bounding box for the mainland US (excludes Alaska and Hawaii)
+    us_bounds = box(-125, 24, -66, 50)
+
+    # Filter counties that fall within the mainland US
+    mainland_us = merged[merged.geometry.intersects(us_bounds)]
+
+    # Separate counties based on data availability
+    nan_counties = mainland_us[mainland_us['FIPS'].isna()]  # No data recorded
+    non_nan_counties = mainland_us[mainland_us['FIPS'].notna()]  # Data recorded
+
+    # Filter state boundaries to only include mainland US
+    mainland_states = usa_states[usa_states.geometry.intersects(us_bounds)]
+
+    # Create the plot
+    fig, ax = plt.subplots(1, 1, figsize=(15, 10))
+
+    # Plot counties using a red color scale (darker red = more data available)
+    mainland_us.plot(column='Data', ax=ax, cmap="Reds", legend=True, 
+                     edgecolor="grey", missing_kwds={"color": "lightgrey"})
+
+    # Overlay state boundaries in red
+    mainland_states.boundary.plot(ax=ax, color='red', linewidth=1, label="State Borders")
+
+    # Set title for the map
+    ax.set_title("Mainland US Counties Present in eaglei_outages", fontsize=16)
+
+    # Display the map
+    plt.show()
+
+
+
+
+def drawMap(df, bounds, ax, name):
+    """
+    Draws a choropleth map of counties within a specified geographic boundary.
+
+    Parameters:
+    df (DataFrame): Pandas DataFrame containing county FIPS codes and 
+                    normalized data availability values ('normalized_non_nan').
+    bounds (shapely.geometry.Polygon): Bounding box defining the region of interest.
+    ax (matplotlib.axes.Axes): Matplotlib Axes object where the map will be drawn.
+    name (str): Name of the region being mapped (used in the title).
+
+    Output:
+    A choropleth map displayed on the provided Matplotlib Axes object.
+    """
+
+    # Load the county shapefile (contains county boundaries)
+    shapefile_path = "../data/US_county_2/cb_2018_us_county_500k.shp"
+    counties = gpd.read_file(shapefile_path)
+
+    # Convert county GEOID codes to string format for proper merging
+    counties['GEOID'] = counties['GEOID'].astype(str)
+
+    # Ensure FIPS codes in the DataFrame are strings and formatted as 5-digit codes
+    df.loc[:, 'fips_code'] = df['fips_code'].astype(str).str.zfill(5)
+
+    # Extract unique FIPS codes and convert them to a DataFrame
+    fips_codes = df.iloc[:, 0].to_numpy().reshape(-1, 1)
+    fips_codes = pd.DataFrame(np.unique(fips_codes), columns=['FIPS'])
+
+    # Ensure FIPS codes are treated as strings
+    fips_codes = fips_codes.astype(str)
+
+    # Merge county boundaries with FIPS codes
+    merged = counties.merge(fips_codes, left_on='GEOID', right_on='FIPS', how='left')
+
+    # Merge with the original DataFrame to retain additional data (e.g., 'normalized_non_nan')
+    merged = merged.merge(df, left_on="FIPS", right_on="fips_code", how="left")
+
+    # Fill missing values in 'normalized_non_nan' with 0 (indicating no data available)
+    merged['normalized_non_nan'] = merged['normalized_non_nan'].fillna(0)
+
+    # Filter counties that are within the specified geographical boundary
+    map_data = merged[merged.geometry.intersects(bounds)]
+
+    # Split data into counties with and without data
+    nan_counties = map_data[map_data['FIPS'].isna()]  # No recorded data
+    non_nan_counties = map_data[map_data['FIPS'].notna()]  # Has recorded data
+
+    # Plot the counties on the given Matplotlib Axes
+    map_data.plot(column='normalized_non_nan', ax=ax, cmap="Reds", legend=True, 
+                  vmin=0, vmax=1, edgecolor="grey", missing_kwds={"color": "lightgrey"})
+
+    # Set x and y axis limits based on the bounding box
+    ax.set_xlim(bounds.bounds[0], bounds.bounds[2])  # Min x to Max x
+    ax.set_ylim(bounds.bounds[1], bounds.bounds[3])  # Min y to Max y
+
+    # Set the title for the plot
+    ax.set_title(f"{name} counties present in eaglei_outages", fontsize=16)
+
+
+
+
+
+def countyCountMAP(year_start, year_end):
+    """
+    Generates a choropleth map displaying county-level power outage data availability 
+    across multiple years. It calculates the frequency of each county appearing in 
+    the dataset and normalizes this count over the given time range.
+
+    Parameters:
+    year_start (int): The starting year for the analysis.
+    year_end (int): The ending year for the analysis.
+
+    Output:
+    - A US mainland map showing data coverage across years.
+    - Separate maps for Hawaii, Alaska, and the Caribbean territories.
+    """
+
+    # Define the folder where outage data is stored
+    data_folder = '../data/eaglei_data/'
+
+    # Create a range of years from start to end
+    years = range(year_start, year_end + 1)
+
+    # Initialize an empty DataFrame to store FIPS codes across years
+    combined_count = pd.DataFrame()
+
+    # Iterate through each year and process the respective outage file
+    for year in years:
+        file_name = f'eaglei_outages_{year}.csv'
+        file_path = os.path.join(data_folder, file_name)
+
+        print(file_name)  # Print file name for debugging
+
+        # Check if the file exists, if not, print a warning and continue
+        if not os.path.exists(file_path):
+            print(f"File {file_name} doesn't exist!")
+            continue
+
+        # Read the CSV file containing outage data
+        df_power = pd.read_csv(file_path)
+
+        # Extract unique FIPS codes (county identifiers) while ignoring duplicate entries
+        unique_fips_2 = (
+            df_power[['fips_code', 'state']]
+            .drop_duplicates()
+            .sort_values(by='fips_code')
+            .reset_index()
+            .drop(columns=['state', 'index'])  # Remove unnecessary columns
+        )
+
+        # Create a new column for the current year
+        unique_fips_2['col'] = unique_fips_2['fips_code']
+        unique_fips_2 = unique_fips_2.rename(columns={'col': year})
+
+        # Merge the data with the combined DataFrame
+        if combined_count.empty:
+            combined_count = unique_fips_2
+        else:
+            combined_count = pd.merge(combined_count, unique_fips_2, on='fips_code', how='outer')
+
+    # Count the number of non-null values for each county across years
+    combined_count['non_nan_count'] = combined_count.drop(columns=['fips_code']).notna().sum(axis=1)
+
+    # Get the number of years considered (i.e., number of columns excluding metadata columns)
+    num_columns_to_count = combined_count.drop(columns=['fips_code', 'non_nan_count']).shape[1]
+
+    # Normalize the count by the number of years to get a proportion
+    combined_count['normalized_non_nan'] = combined_count['non_nan_count'] / num_columns_to_count
+
+    # Keep only relevant columns for mapping
+    df = combined_count[['fips_code', 'normalized_non_nan']]
+
+    # Generate a nationwide map displaying data availability
+    missingCountyMapManyYears(df)
+
+    # Define bounding boxes for different US regions
+    hawaii_bounds = box(-161, 18, -154, 23)  # Hawaii
+    alaska_bounds = box(-180, 50, -125, 72)  # Alaska
+    caribbean_bounds = box(-68, 17.5, -64.4, 18.7)  # Caribbean (Puerto Rico & US Virgin Islands)
+
+    # Create subplots for each region
+    fig, axes = plt.subplots(1, 3, figsize=(18, 6))
+
+    # Draw maps for Hawaii, Alaska, and the Caribbean
+    drawMap(df, hawaii_bounds, axes[0], "Hawaii")
+    drawMap(df, alaska_bounds, axes[1], "Alaska")
+    drawMap(df, caribbean_bounds, axes[2], "United States Virgin Islands and Puerto Rico")
+
+    # Adjust layout and display the maps
+    plt.tight_layout()
+    plt.show()
