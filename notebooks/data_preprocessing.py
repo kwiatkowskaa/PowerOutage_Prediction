@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import plotly.express as px
 import geopandas as gpd
+from shapely.geometry import box
+
 import geodatasets
 import os
 from matplotlib.colors import ListedColormap, Normalize
@@ -717,23 +719,23 @@ def combine_agg_ts1(county,
 
 
 
-
-def countyCountYEarly(year_start, year_end):
+def countyCountYEarly(year_start, year_end, dfs):
     """
-    Analyzes power outage data from CSV files for a given range of years, 
-    counts the number of unique counties (FIPS codes) affected each year, 
+    Analyzes power outage data from a list of DataFrames for a given range of years.
+    Counts the number of unique counties (FIPS codes) affected each year 
     and visualizes the results using a bar chart.
 
     Parameters:
-    year_start (int): The starting year of the analysis.
-    year_end (int): The ending year of the analysis.
+    year_start (int): The starting year of the analysis (inclusive).
+    year_end (int): The ending year of the analysis (inclusive).
+    dfs (list of pd.DataFrame): A list of Pandas DataFrames, where each DataFrame corresponds 
+                                to a specific year in sequential order (e.g., dfs[0] is for 2014, dfs[1] is for 2015, etc.).
+                                Each DataFrame must contain a column named 'fips_code'.
 
     Output:
     A bar chart displaying the number of unique FIPS codes per year.
     """
 
-    # Define the folder where CSV files are stored
-    data_folder = '../data/eaglei_data/'
 
     # Generate a range of years to process
     years = range(year_start, year_end + 1)
@@ -743,19 +745,9 @@ def countyCountYEarly(year_start, year_end):
 
     # Iterate through each year in the specified range
     for year in years:
-        # Construct the expected filename for the given year
-        file_name = f'eaglei_outages_{year}.csv'
-        file_path = os.path.join(data_folder, file_name)
-        
-        # Check if the file exists, if not, append 0 and continue to the next year
-        if not os.path.exists(file_path):
-            print(f"File {file_name} doesn't exist!")
-            year_counts.append(0)
-            continue
 
-        # Read the CSV file into a Pandas DataFrame
-        df_power = pd.read_csv(file_path)
-
+        # Access the DataFrame corresponding to the current year
+        df_power = dfs[year - 2014]
         # Count the number of unique FIPS codes in the dataset
         unique_fips_count = df_power['fips_code'].nunique()
         
@@ -785,7 +777,8 @@ def countyCountYEarly(year_start, year_end):
 
 
 
-def countyCountBarPlots(year_start, year_end):
+
+def countyCountBarPlots(year_start, year_end, dfs):
     """
     Analyzes power outage data from CSV files for a given range of years, 
     counts the number of unique counties (FIPS codes) affected in each state per year, 
@@ -794,13 +787,13 @@ def countyCountBarPlots(year_start, year_end):
     Parameters:
     year_start (int): The starting year of the analysis.
     year_end (int): The ending year of the analysis.
+    dfs (list of pd.DataFrame): A list of Pandas DataFrames, where each DataFrame corresponds 
+                                to a specific year in sequential order (e.g., dfs[0] is for 2014, dfs[1] is for 2015, etc.).
+                                Each DataFrame must contain a column named 'fips_code'.
 
     Output:
     A grid of horizontal bar charts displaying the number of unique FIPS codes per state for each year.
     """
-
-    # Define the folder where CSV files are stored
-    data_folder = '../data/eaglei_data/'
 
     # Generate a range of years to process
     years = range(year_start, year_end + 1)
@@ -818,17 +811,9 @@ def countyCountBarPlots(year_start, year_end):
 
     # Iterate through each year in the specified range
     for i, year in enumerate(years):
-        # Construct the expected filename for the given year
-        file_name = f'eaglei_outages_{year}.csv'
-        file_path = os.path.join(data_folder, file_name)
-        
-        # Check if the file exists, if not, print a message and skip to the next year
-        if not os.path.exists(file_path):
-            print(f"File {file_name} doesn't exist!")
-            continue
 
-        # Read the CSV file into a Pandas DataFrame
-        df_power = pd.read_csv(file_path)
+        # Access the DataFrame corresponding to the current year
+        df_power = dfs[year - 2014]
 
         # Standardize state names (corrects 'US Virgin Islands' to 'United States Virgin Islands')
         df_power['state'] = df_power['state'].replace('US Virgin Islands', 'United States Virgin Islands')
@@ -859,7 +844,7 @@ def countyCountBarPlots(year_start, year_end):
 
 
 
-def countyCountBarPlots_v2(year_start, year_end):
+def countyCountBarPlots_v2(year_start, year_end, dfs):
     """
     Analyzes power outage data from CSV files for a given range of years, 
     counts the number of unique counties (FIPS codes) affected in each state per year, 
@@ -868,13 +853,14 @@ def countyCountBarPlots_v2(year_start, year_end):
     Parameters:
     year_start (int): The starting year of the analysis.
     year_end (int): The ending year of the analysis.
+    dfs (list of pd.DataFrame): A list of Pandas DataFrames, where each DataFrame corresponds 
+                                to a specific year in sequential order (e.g., dfs[0] is for 2014, dfs[1] is for 2015, etc.).
+                                Each DataFrame must contain a column named 'fips_code'.
 
     Output:
     A horizontal bar chart displaying the number of unique FIPS codes per state across multiple years.
     """
 
-    # Define the folder where CSV files are stored
-    data_folder = '../data/eaglei_data/'
 
     # Generate a range of years to process
     years = range(year_start, year_end + 1)
@@ -884,17 +870,9 @@ def countyCountBarPlots_v2(year_start, year_end):
 
     # Iterate through each year in the specified range
     for year in years:
-        # Construct the expected filename for the given year
-        file_name = f'eaglei_outages_{year}.csv'
-        file_path = os.path.join(data_folder, file_name)
 
-        # Check if the file exists, if not, print a message and skip to the next year
-        if not os.path.exists(file_path):
-            print(f"File {file_name} doesn't exist!")
-            continue
-
-        # Read the CSV file into a Pandas DataFrame
-        df_power = pd.read_csv(file_path)
+        # Access the DataFrame corresponding to the current year
+        df_power = dfs[year - 2014]
 
         # Standardize state names (corrects 'US Virgin Islands' to 'United States Virgin Islands')
         df_power['state'] = df_power['state'].replace('US Virgin Islands', 'United States Virgin Islands')
@@ -951,12 +929,15 @@ def countyCountBarPlots_v2(year_start, year_end):
 
 
 
-def missingCountyMap(years):
+def missingCountyMap(years, dfs):
     """
     Visualizes missing county data for power outages across multiple years using maps.
 
     Parameters:
     years (list of int): A list of years for which missing county data should be mapped.
+    dfs (list of pd.DataFrame): A list of Pandas DataFrames, where each DataFrame corresponds 
+                                to a specific year in sequential order (e.g., dfs[0] is for 2014, dfs[1] is for 2015, etc.).
+                                Each DataFrame must contain a column named 'fips_code'.
 
     Output:
     A series of maps (one per year) showing counties with and without recorded outage data.
@@ -971,26 +952,15 @@ def missingCountyMap(years):
     # Ensure GEOID (FIPS code) is stored as a string for proper merging
     counties['GEOID'] = counties['GEOID'].astype(str)
 
-    # Define the folder where power outage data CSV files are stored
-    data_folder = '../data/eaglei_data/'
-
     # Determine the number of columns (one plot per year, arranged in a row)
     cols = len(years)  
     fig, axes = plt.subplots(1, cols, figsize=(5 * cols, 3))  # Single-row grid of maps
 
     # Loop through each specified year
     for idx, year in enumerate(years):
-        # Construct the expected filename for the given year
-        file_name = f'eaglei_outages_{year}.csv'
-        file_path = os.path.join(data_folder, file_name)
 
-        # Check if the file exists, if not, print a message and skip to the next year
-        if not os.path.exists(file_path):
-            print(f"File {file_name} doesn't exist!")
-            continue
-
-        # Read the power outage data into a Pandas DataFrame
-        df_power = pd.read_csv(file_path)
+        # Access the DataFrame corresponding to the current year
+        df_power = dfs[year - 2014]
 
         # Ensure FIPS codes are strings and correctly formatted to five digits
         df_power['fips_code'] = df_power['fips_code'].astype(str).str.zfill(5)
@@ -1086,10 +1056,6 @@ def missingCountyMapManyYears(df):
     # Filter counties that fall within the mainland US
     mainland_us = merged[merged.geometry.intersects(us_bounds)]
 
-    # Separate counties based on data availability
-    nan_counties = mainland_us[mainland_us['FIPS'].isna()]  # No data recorded
-    non_nan_counties = mainland_us[mainland_us['FIPS'].notna()]  # Data recorded
-
     # Filter state boundaries to only include mainland US
     mainland_states = usa_states[usa_states.geometry.intersects(us_bounds)]
 
@@ -1156,10 +1122,6 @@ def drawMap(df, bounds, ax, name):
     # Filter counties that are within the specified geographical boundary
     map_data = merged[merged.geometry.intersects(bounds)]
 
-    # Split data into counties with and without data
-    nan_counties = map_data[map_data['FIPS'].isna()]  # No recorded data
-    non_nan_counties = map_data[map_data['FIPS'].notna()]  # Has recorded data
-
     # Plot the counties on the given Matplotlib Axes
     map_data.plot(column='normalized_non_nan', ax=ax, cmap="Reds", legend=True, 
                   vmin=0, vmax=1, edgecolor="grey", missing_kwds={"color": "lightgrey"})
@@ -1175,7 +1137,7 @@ def drawMap(df, bounds, ax, name):
 
 
 
-def countyCountMAP(year_start, year_end):
+def countyCountMAP(year_start, year_end, dfs):
     """
     Generates a choropleth map displaying county-level power outage data availability 
     across multiple years. It calculates the frequency of each county appearing in 
@@ -1184,14 +1146,14 @@ def countyCountMAP(year_start, year_end):
     Parameters:
     year_start (int): The starting year for the analysis.
     year_end (int): The ending year for the analysis.
+    dfs (list of pd.DataFrame): A list of Pandas DataFrames, where each DataFrame corresponds 
+                                to a specific year in sequential order (e.g., dfs[0] is for 2014, dfs[1] is for 2015, etc.).
+                                Each DataFrame must contain a column named 'fips_code'.
 
     Output:
     - A US mainland map showing data coverage across years.
     - Separate maps for Hawaii, Alaska, and the Caribbean territories.
     """
-
-    # Define the folder where outage data is stored
-    data_folder = '../data/eaglei_data/'
 
     # Create a range of years from start to end
     years = range(year_start, year_end + 1)
@@ -1201,18 +1163,12 @@ def countyCountMAP(year_start, year_end):
 
     # Iterate through each year and process the respective outage file
     for year in years:
-        file_name = f'eaglei_outages_{year}.csv'
-        file_path = os.path.join(data_folder, file_name)
 
-        print(file_name)  # Print file name for debugging
+        # Access the DataFrame corresponding to the current year
+        df_power = dfs[year - 2014]
 
-        # Check if the file exists, if not, print a warning and continue
-        if not os.path.exists(file_path):
-            print(f"File {file_name} doesn't exist!")
-            continue
-
-        # Read the CSV file containing outage data
-        df_power = pd.read_csv(file_path)
+        # Ensure fips_code is stored as a string for consistency
+        df_power['fips_code'] = df_power['fips_code'].astype(str)
 
         # Extract unique FIPS codes (county identifiers) while ignoring duplicate entries
         unique_fips_2 = (
