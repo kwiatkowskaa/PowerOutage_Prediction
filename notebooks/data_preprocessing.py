@@ -5,7 +5,7 @@ import numpy as np
 import plotly.express as px
 import geopandas as gpd
 from shapely.geometry import box
-
+import plotly.express as px
 import geodatasets
 import os
 from matplotlib.colors import ListedColormap, Normalize
@@ -1220,3 +1220,216 @@ def countyCountMAP(year_start, year_end, dfs):
     # Adjust layout and display the maps
     plt.tight_layout()
     plt.show()
+
+
+
+
+def load_data(file_path):
+    """
+    Loads weather data and converts the 'date' column to datetime format.
+    Convert fips column to 5-digit.
+    """
+    df = pd.read_csv(file_path)
+    df['fips'] = df['fips'].astype(str).str.zfill(5)
+
+    df['date'] = pd.to_datetime(df['date'].astype(str), format='%Y%m%d')
+    df['year'] = df['date'].dt.year
+    df['month'] = df['date'].dt.month
+    df['day'] = df['date'].dt.day
+    return df
+
+
+
+def plot_precipitation_seasonality(df, year):
+    """
+    Creates a histogram plot of daily precipitation for a selected year.
+    """
+    data = df[df['year'] == year]
+    plt.figure(figsize=(10, 6))
+    sns.histplot(data=data, x='date', weights='ppt', fill=True)
+    plt.xlabel('Date')
+    plt.ylabel('Precipitation Density')
+    plt.title(f'Precipitation Seasonality in {year}')
+    plt.show()
+
+
+
+def plot_temperature_trend(df, year):
+    """
+    Creates a line plot of the monthly minimum and maximum temperature for a selected year.
+    """
+    data = df[df['year'] == year].groupby('month')[['tmin', 'tmax']].mean().reset_index()
+    plt.figure(figsize=(10, 6))
+    sns.lineplot(data=data, x='month', y='tmin', label='Tmin', marker='o')
+    sns.lineplot(data=data, x='month', y='tmax', label='Tmax', marker='o')
+    plt.xticks(range(1, 13))
+    plt.xlabel('Month')
+    plt.ylabel('Temperature (°C)')
+    plt.title(f'Minimum and Maximum Temperature in {year}')
+    plt.legend()
+    plt.show()
+
+
+
+
+def plot_precipitation_by_year(year, df):
+    """
+    This function generates a choropleth map showing the total precipitation in millimeters
+    for the selected year across counties in the United States (excluding Alaska and islands).
+    
+    Parameters:
+    year (int): The year for which the precipitation data will be shown.
+    df (pandas DataFrame): The DataFrame containing the columns 'fips', 'ppt', and 'year'.
+    """
+    # Filter the data for the chosen year
+    year_data = df[df['year'] == year]
+    
+    # Aggregate the data by FIPS (summing the precipitation values)
+    year_data_aggregated = year_data.groupby('fips').agg({'ppt': 'sum'}).reset_index()
+    max_ppt = year_data_aggregated['ppt'].max()
+    
+    # Create the choropleth map
+    fig = px.choropleth(year_data_aggregated, 
+                        geojson="https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json",
+                        locations='fips', color='ppt',
+                        color_continuous_scale="Blues",
+                        title=f"Total Precipitation in {year} (mm)",
+                        labels={"ppt": "Total Precipitation (mm)"},
+                        range_color=[0, max_ppt])
+    
+    # Exclude Alaska and islands from the map by adjusting the geographic scope
+    fig.update_geos(
+        scope="usa",  # Set the scope to "usa", excluding Alaska and islands
+        visible=False,  # Set visibility to False to exclude from the map
+        fitbounds="locations"
+    )
+    fig.update_traces(marker_line_width=0.2, selector=dict(type='choropleth'))
+
+    # Display the map
+    fig.show()
+
+
+def plot_precipitation_by_year(year, df):
+    """
+    This function generates a choropleth map showing the total precipitation in millimeters
+    for the selected year across counties in the United States (excluding Alaska and islands).
+    
+    Parameters:
+    year (int): The year for which the precipitation data will be shown.
+    df (pandas DataFrame): The DataFrame containing the columns 'fips', 'ppt', and 'year'.
+    """
+    # Filter the data for the chosen year
+    year_data = df[df['year'] == year]
+    
+    # Aggregate the data by FIPS (summing the precipitation values)
+    year_data_aggregated = year_data.groupby('fips').agg({'ppt': 'sum'}).reset_index()
+    max_ppt = year_data_aggregated['ppt'].max()
+    
+    # Create the choropleth map
+    fig = px.choropleth(year_data_aggregated, 
+                        geojson="https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json",
+                        locations='fips', color='ppt',
+                        color_continuous_scale="Blues",
+                        title=f"Total Precipitation in {year} (mm)",
+                        labels={"ppt": "Total Precipitation (mm)"},
+                        range_color=[0, max_ppt])
+    
+    # Exclude Alaska and islands from the map by adjusting the geographic scope
+    fig.update_geos(
+        scope="usa",  # Set the scope to "usa", excluding Alaska and islands
+        visible=False,  # Set visibility to False to exclude from the map
+        fitbounds="locations"
+    )
+    fig.update_traces(marker_line_width=0.2, selector=dict(type='choropleth'))
+
+    # Display the map
+    fig.show()
+
+
+
+def plot_avg_temp_by_year(year, df):
+    """
+    This function generates a choropleth map showing the avgerage temperature in Cellcius degree
+    for the selected year across counties in the United States (excluding Alaska and islands).
+    
+    Parameters:
+    year (int): The year for which the precipitation data will be shown.
+    df (pandas DataFrame): The DataFrame containing the columns 'fips', 'tavg', and 'year'.
+    """
+    # Filter the data for the chosen year
+    year_data = df[df['year'] == year]
+    
+    # Aggregate the data by FIPS (summing the precipitation values)
+    year_data_aggregated = year_data.groupby('fips').agg({'tavg': 'mean'}).reset_index()
+    max_t = year_data_aggregated['tavg'].max()
+    min_t = year_data_aggregated['tavg'].min()
+    
+    # Create the choropleth map
+    fig = px.choropleth(year_data_aggregated, 
+                        geojson="https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json",
+                        locations='fips', color='tavg',
+                        color_continuous_scale="RdBu_r",
+                        title=f"Average Temperature in {year} (°C)",
+                        labels={"tavg": "Avg Temp (°C)"},
+                        range_color=[min_t, max_t])
+    
+    # Exclude Alaska and islands from the map by adjusting the geographic scope
+    fig.update_geos(
+        scope="usa",  # Set the scope to "usa", excluding Alaska and islands
+        visible=False,  # Set visibility to False to exclude from the map
+        fitbounds="locations"
+    )
+    fig.update_traces(marker_line_width=0.2, selector=dict(type='choropleth'))
+
+    # Display the map
+    fig.show()
+
+
+
+
+
+def visualize_avg_temp_by_month(year, df):
+    """
+    This function generates an animated choropleth map showing the average temperature by month
+    across counties in the United States (excluding Alaska and islands).
+    
+    Parameters:
+    df (pandas DataFrame): The DataFrame containing the columns 'fips', 'tavg', 'year', and 'month'.
+    """
+    # Ensure that year and month columns exist in the dataframe
+    if 'month' not in df.columns or 'year' not in df.columns:
+        raise ValueError("The DataFrame must contain 'year' and 'month' columns.")
+    
+    # Filter the data for the chosen year
+    year_data = df[df['year'] == year]
+    # Aggregate the data by FIPS and month (averaging the temperature values)
+    df_aggregated = year_data.groupby(['fips','year', 'month']).agg({'tavg': 'mean'}).reset_index()
+    
+    # Get min and max temperature values for color scale
+    max_t = df_aggregated['tavg'].max()
+    min_t = df_aggregated['tavg'].min()
+
+    range_color = [-max(abs(min_t), abs(max_t)), max(abs(min_t), abs(max_t))]
+    
+    # Create the animated choropleth map
+    fig = px.choropleth(df_aggregated, 
+                        geojson="https://raw.githubusercontent.com/plotly/datasets/master/geojson-counties-fips.json",
+                        locations='fips', color='tavg',
+                        color_continuous_scale="RdBu_r",
+                        animation_frame='month',  # Animate by month
+                        animation_group='year',  # Group by year
+                        title=f"Average Temperature by Month in the US in {year} (°C)",
+                        labels={"tavg": "Avg Temp (°C)"},
+                        range_color=range_color)
+    fig.update_traces(marker_line_width=0.2, selector=dict(type='choropleth'))
+    
+    # Exclude Alaska and islands from the map by adjusting the geographic scope
+    fig.update_geos(
+        scope="usa",  # Set the scope to "usa", excluding Alaska and islands
+        visible=False,  # Set visibility to False to exclude from the map
+        fitbounds="locations"
+    )
+    
+    # Display the animated map
+    fig.show()
+
