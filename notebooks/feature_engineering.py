@@ -287,3 +287,202 @@ def combine_dfs(dfs):
     """
     combined_df = pd.concat(dfs, ignore_index=True)
     return combined_df
+
+
+
+def addGeo(df, geo):
+    """
+    Adds latitude (lat) and longitude (lng) columns from the geo DataFrame 
+    to the df DataFrame based on matching fips_code in df and county_fips in geo.
+    
+    :param df: DataFrame containing the main data with 'fips_code'
+    :param geo: DataFrame containing 'county_fips', 'lat', and 'lng'
+    :return: DataFrame with added 'lat' and 'lng' columns
+    """
+    # Merging df with geo DataFrame on 'fips_code' from df and 'county_fips' from geo
+    df_with_geo = pd.merge(df, geo, left_on='fips_code', right_on='county_fips', how='left')
+    
+    return df_with_geo
+
+
+def summarize_missing_by_event_type(dfs, names=None):
+    summaries = []
+    
+    for i, df in enumerate(dfs):
+        dataset_name = names[i] if names else f"stormEvents_{2014+i}"
+        
+        # Grupowanie danych po 'event_type' i obliczanie braków dla każdej grupy
+        for event_type, group in df.groupby('event_type'):
+            missing_count = group['MAGNITUDE'].isna().sum()
+            present_count = group['MAGNITUDE'].notna().sum()
+            total_count = len(group)
+            
+            summaries.append({
+                'DATASET': dataset_name,
+                'EVENT_TYPE': event_type,
+                'MISSING_MAGNITUDE': missing_count,
+                'PRESENT_MAGNITUDE': present_count,
+                'MISSING_PERCENT': round((missing_count / total_count) * 100, 2)
+            })
+    
+
+def encode_tornado_scale(df):
+    """
+    Replaces 'EFU' values in the 'TOR_F_SCALE' column with the median of 
+    'TOR_F_SCALE' values for rows with the same 'STATE_FIPS'. Keeps other 
+    missing values (NaN) unchanged.
+
+    :param df: DataFrame with 'TOR_F_SCALE', 'STATE_FIPS', and 'EVENT_TYPE' columns
+    :return: DataFrame with updated 'TOR_F_SCALE' values
+    """
+    # Map tornado scales to numerical values, converting 'EFU' to -1 temporarily
+    mapping = {
+        'EF0': 1,
+        'EF1': 2,
+        'EF2': 3,
+        'EF3': 4,
+        'EF4': 5,
+        'EF5': 6,
+        'EFU': -1  # Use -1 to flag 'EFU' for replacement later
+    }
+    
+    # Apply the mapping to convert 'TOR_F_SCALE' values
+    df['TOR_F_SCALE'] = df['TOR_F_SCALE'].map(mapping)
+    
+    # Calculate the median of 'TOR_F_SCALE' grouped by 'STATE_FIPS',
+    # excluding rows where 'TOR_F_SCALE' equals -1 (flagged 'EFU') or is NaN.
+    state_medians = df[(df["EVENT_TYPE"] == "Tornado") & (df["TOR_F_SCALE"] != -1)].groupby('STATE_FIPS')['TOR_F_SCALE'].median()
+    
+    # Function to replace 'EFU' (-1) with the median for the corresponding 'STATE_FIPS'
+    def replace_efu(row):
+        if row["TOR_F_SCALE"] == -1:
+            # Use the median for the 'STATE_FIPS', or retain the current value if no median exists
+            return state_medians.get(row["STATE_FIPS"], row["TOR_F_SCALE"])
+        return row["TOR_F_SCALE"]
+    # Apply the replacement function row by row
+    df['TOR_F_SCALE'] = df.apply(replace_efu, axis=1)
+    
+    return df
+
+def fill_magnitude_using_category_and_tor_f_scale(df):
+    """
+    Fills empty values in the 'MAGNITUDE' column using 'CATEGORY' first, and if 'CATEGORY' 
+    is also empty, it uses 'TOR_F_SCALE' to fill the missing value.
+
+    :param df: DataFrame containing the columns 'MAGNITUDE', 'CATEGORY', and 'TOR_F_SCALE'
+    :return: DataFrame with updated values in the 'MAGNITUDE' column
+    """
+    def fill_magnitude(row):
+        # Fill 'MAGNITUDE' first using 'CATEGORY', then 'TOR_F_SCALE' if needed
+        if pd.isna(row['MAGNITUDE']):
+            if not pd.isna(row['CATEGORY']):
+                return row['CATEGORY']
+            elif not pd.isna(row['TOR_F_SCALE']):
+                return row['TOR_F_SCALE']
+        return row['MAGNITUDE']
+    df = encode_tornado_scale(df)
+    # Apply the logic row-wise to fill 'MAGNITUDE'
+    df['MAGNITUDE'] = df.apply(fill_magnitude, axis=1)
+    
+    return df
+
+def create_event_columns(df):
+    """
+    Creates columns for each unique value in the 'EVENT_TYPE' column.
+    For each row:
+    - If 'EVENT_TYPE' belongs to the specified set, the column with the name of 'EVENT_TYPE' is filled with 'MAGNITUDE'.
+    - Otherwise, the column with the name of 'EVENT_TYPE' is filled with 1.
+    In all other columns, the values are set to 0.
+
+    :param df: DataFrame containing 'EVENT_TYPE' and 'MAGNITUDE' columns
+    :return: DataFrame with additional columns for each unique 'EVENT_TYPE'
+    """
+
+    df = fill_magnitude_using_category_and_tor_f_scale(df)
+
+    # Define the set of EVENT_TYPE values for which MAGNITUDE will be used
+    event_type_with_magnitude = {
+        "Hail", "High Wind", "Hurricane", "Hurricane (Typhoon)", 
+        "Marine Hail", "Marine High Wind", "Marine Strong Wind", 
+        "Marine Thunderstorm Wind", "Strong Wind", "Thunderstorm Wind", "Tornado"
+    }
+
+    # Iterate through each unique value in the 'EVENT_TYPE' column
+    for event in df['EVENT_TYPE'].unique():
+        # Initialize the column with default values (0)
+        df[event] = 0.0
+
+        # Update column based on conditions
+        df.loc[df['EVENT_TYPE'] == event, event] = df.apply(
+            lambda row: row['MAGNITUDE'] if row['EVENT_TYPE'] in event_type_with_magnitude else 1,
+            axis=1
+        )
+
+        columns_to_remove = [
+            "TOR_F_SCALE", "CATEGORY"
+        ]
+    df = df.drop(columns=columns_to_remove)
+    
+    return df
+
+def convert_damage_property(df):
+    """
+    Converts the 'DAMAGE_PROPERTY' column in the DataFrame to integer values.
+    - 'K' represents thousands (multiplies by 1,000).
+    - 'M' represents millions (multiplies by 1,000,000).
+    - NaN values are preserved as NaN.
+
+    :param df: DataFrame with a 'DAMAGE_PROPERTY' column
+    :return: DataFrame with 'DAMAGE_PROPERTY' converted to integers
+    """
+    def convert_value(value):
+        if pd.isna(value):  # Handle NaN values
+            return np.nan
+        elif value.endswith('K'):  # Convert 'K' to thousands
+            return int(float(value[:-1]) * 1000)
+        elif value.endswith('M'):  # Convert 'M' to millions
+            return int(float(value[:-1]) * 1000000)
+        elif value.endswith('B'):  # Convert 'B' to billions
+            return int(float(value[:-1]) * 1000000000)
+        else:
+            raise ValueError(f"Unexpected format: {value}")
+
+    # Apply the conversion function to the DAMAGE_PROPERTY column
+    df['DAMAGE_PROPERTY'] = df['DAMAGE_PROPERTY'].apply(convert_value)
+    df['DAMAGE_CROPS'] = df['DAMAGE_CROPS'].apply(convert_value)
+
+
+    return df
+
+def process_storm_events(df):
+    """
+    Processes the storm events DataFrame by creating new columns for total damages, 
+    total injuries, and percent of deaths. Removes specified columns from the DataFrame.
+
+    :param df: DataFrame containing storm event data with relevant columns
+    :return: Modified DataFrame with new calculated columns and removed unwanted columns
+    """
+    # Calculate total damages by summing DAMAGE_PROPERTY and DAMAGE_CROPS
+    df["total_damages"] = df["DAMAGE_PROPERTY"] + df["DAMAGE_CROPS"]
+    
+    # Calculate total injuries by summing deaths and injuries (direct and indirect)
+    df["total_people_injuries"] = (
+        df["DEATHS_DIRECT"] + df["DEATHS_INDIRECT"] + 
+        df["INJURIES_DIRECT"] + df["INJURIES_INDIRECT"]
+    )
+    
+    # Calculate percent of deaths (avoiding division by zero using pd.NA)
+    df["percent_of_deaths"] = (
+        (df["DEATHS_DIRECT"] + df["DEATHS_INDIRECT"]) / 
+        df["total_people_injuries"].replace(0, pd.NA)
+    )
+    
+    # Remove specified columns
+    columns_to_remove = [
+        "DAMAGE_PROPERTY", "DAMAGE_CROPS", 
+        "DEATHS_DIRECT", "DEATHS_INDIRECT", 
+        "INJURIES_DIRECT", "INJURIES_INDIRECT"
+    ]
+    df = df.drop(columns=columns_to_remove)
+    
+    return df
