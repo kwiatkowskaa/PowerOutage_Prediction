@@ -486,3 +486,28 @@ def process_storm_events(df):
     df = df.drop(columns=columns_to_remove)
     
     return df
+
+def plot_seasonal_data(list_of_datasets, type, ylabel):
+    fig, axes = plt.subplots(2, 5, figsize=(15,10))
+    for i in range(10):
+        k = i % 5
+        j = 0
+        df = list_of_datasets[i]
+
+        if i > 4:
+            j = 1
+        if type == 'season_customer':
+            column = df.groupby('season')['customers_out'].mean()
+        elif type == 'daytime_customer':
+            column = df.groupby('daytime')['customers_out'].mean()
+        elif type == 'season_catastrophes':
+            column = df.groupby('season')['EVENT_TYPE'].count()
+        elif type == 'daytime_catastrophes':
+            column = df.groupby('daytime')['EVENT_TYPE'].count()
+
+        axes[j, k].bar(column.index, column.values, color=['green', 'yellow', 'orange', 'blue'])
+        axes[j, k].set_ylabel(ylabel)
+        axes[j, k].set_title(f'Year {i + 2014}')
+
+    plt.tight_layout()
+    plt.show()
