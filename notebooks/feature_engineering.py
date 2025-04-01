@@ -511,3 +511,36 @@ def plot_seasonal_data(list_of_datasets, type, ylabel):
 
     plt.tight_layout()
     plt.show()
+
+
+def plot(list_of_datasets, type, ylabel):
+    fig, axes = plt.subplots(2, 5, figsize=(20,12))
+    for i in range(10):
+        k = i % 5
+        j = 0
+        df = list_of_datasets[i]
+        df['run_start_time'] = pd.to_datetime(df['run_start_time'])
+
+        if i > 4:
+            j = 1
+        if type == 'column':
+            column = df.groupby('Division')['customers_out'].mean()
+            axes[j, k].bar(column.index, column.values, color=['green', 'yellow', 'orange', 'blue', 'red', 'pink', 'purple', 'grey', 'brown'])
+            axes[j, k].set_ylabel(ylabel)
+            axes[j, k].set_title(f'Year {i + 2014}')
+            axes[j, k].tick_params(axis='x', rotation=90) 
+
+        elif type == 'timedata':
+            df_grouped = df.groupby(["Division", "run_start_time"])["customers_out"].mean().reset_index()
+            divisions = ['Pacific', 'Middle Atlantic', 'South Atlantic']
+            for division in divisions:
+                subset = df_grouped[df_grouped["Division"] == division]
+                axes[j, k].plot(subset["run_start_time"], subset["customers_out"], 
+                     marker="o", linestyle="-", label=division, 
+                     linewidth=1, alpha=0.6)
+            axes[j, k].set_ylabel(ylabel)
+            axes[j, k].set_title(f'Year {i + 2014}')
+            axes[j, k].tick_params(axis='x', rotation=90) 
+
+    plt.tight_layout()
+    plt.show()
