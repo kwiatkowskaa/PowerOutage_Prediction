@@ -179,3 +179,36 @@ def calculate_state_summary(state_df, state_name):
     }
     
     return summary
+
+def transform_df(df):
+       df['Date'] = pd.to_datetime(df['Date'])
+       df_high = df[df['CountyName'] == 'Waynesboro'][df['StateName'] == 'Virginia']
+       df_low = df[df['CountyName'] == 'Suffolk'][df['StateName'] == 'New York']
+
+       col_to_stay = ['Date', 'PercentCustomersOut', 'Season', 'Tmin',
+              'Tmax', 'Tavg', 'Ppt',  'Flood', 'Winter Weather', 'Heavy Rain', 'Strong Wind', 'Flash Flood', 'Heavy Snow', 'Thunderstorm Wind', 'Excessive Heat', 'Winter Storm', 'Drought', 'Tornado', 'Hail', 'Heat', 'High Wind']
+
+       df_high = df_high[[col for col in col_to_stay if col in df_high.columns]]
+       df_high = pd.get_dummies(df_high, columns=['Season'])
+       df_high['Date'] = pd.to_datetime(df_high['Date'], errors='coerce')
+       df_high = df_high.sort_values('Date')
+       df_high = df_high.apply(lambda x: x.astype(int) if x.dtype == 'bool' else x)
+       df_low = df_low[[col for col in col_to_stay if col in df_low.columns]]
+       df_low = pd.get_dummies(df_low, columns=['Season'])
+       df_low['Date'] = pd.to_datetime(df_low['Date'], errors='coerce')
+       df_low = df_low.sort_values('Date')
+       df_low = df_low.apply(lambda x: x.astype(int) if x.dtype == 'bool' else x)
+
+       df_high.set_index('Date', inplace=True)
+       df_low.set_index('Date', inplace=True)
+
+       df_high_train = df_high.iloc[:-365]
+       df_low_train = df_low.iloc[:-365]
+       df_high_test = df_high.iloc[-365:]
+       df_low_test = df_low.iloc[-365:]
+
+       df_high_train = df_high_train[~df_high_train.index.duplicated()]
+       df_low_train = df_low_train[~df_low_train.index.duplicated()]
+       df_high_test = df_high_test[~df_high_test.index.duplicated()]
+       df_low_test = df_low_test[~df_low_test.index.duplicated()]
+       return df_high_train, df_low_train, df_high_test, df_low_test
