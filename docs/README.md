@@ -48,7 +48,7 @@ Additionally, the folder includes Python scripts with reusable functions:
 Pre-trained model files:
 
 - **xgb_model.pkl** – Best-performing XGBoost model (after grid search/random search), not used in the interpretability phase.
-- **tabnet_model.zip** – Initial TabNet model trained on the complete dataset (even though better model was trained it was not much better so weused for interpretability this one).
+- **tabnet_model.zip** – Initial TabNet model trained on the complete dataset (even though better model was trained it was not much better, so we used this model for interpretability).
 - **model_TabNet_florida.zip** – TabNet model trained on Florida-specific data (showed significant improvements in localized modeling).
 - **model_MLP.pkl** – Best-trained Multi-Layer Perceptron (MLP) model.
 - **suffolk_sarimax_model.pkl** – Best SARIMAX model for Suffolk County (no peak data).
